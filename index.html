@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>工事監理報告書 作成ツール</title>
+<style>
+  :root{
+    --wood:#AD8A5C;
+    --charcoal:#2B2621;
+    --cream:#F7F4EF;
+    --line:#000;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family: "游ゴシック","Yu Gothic","Hiragino Kaku Gothic ProN",sans-serif;
+    background:#e9e5df;
+    margin:0;
+    padding:24px;
+    color:var(--charcoal);
+  }
+  h1{
+    font-size:20px;
+    border-left:6px solid var(--wood);
+    padding-left:10px;
+    margin:0 0 16px;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns: 380px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  .panel{
+    background:#fff;
+    border-radius:8px;
+    padding:16px 18px;
+    box-shadow:0 1px 4px rgba(0,0,0,.12);
+  }
+  .panel h2{
+    font-size:14px;
+    color:var(--wood);
+    border-bottom:1px solid #ddd;
+    padding-bottom:6px;
+    margin:18px 0 10px;
+  }
+  .panel h2:first-of-type{margin-top:0;}
+  label{
+    display:block;
+    font-size:12px;
+    color:#555;
+    margin:8px 0 2px;
+  }
+  input[type=text], input[type=date]{
+    width:100%;
+    padding:6px 8px;
+    font-size:13px;
+    border:1px solid #ccc;
+    border-radius:4px;
+    font-family:inherit;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .radiogroup label{
+    display:flex;align-items:center;gap:6px;
+    font-size:13px;color:var(--charcoal);
+    margin:6px 0;
+  }
+  .radiogroup input{width:auto;}
+  .hint{
+    font-size:11px;
+    color:#888;
+    margin-top:2px;
+    line-height:1.5;
+  }
+  .checklabel{
+    display:flex;align-items:center;gap:6px;
+    font-size:12px;color:#555;margin-top:10px;
+  }
+  .checklabel input{width:auto;}
+  button{
+    background:var(--wood);
+    color:#fff;
+    border:none;
+    padding:10px 16px;
+    border-radius:6px;
+    font-size:13px;
+    cursor:pointer;
+    margin-top:16px;
+    width:100%;
+  }
+  button:hover{opacity:.9;}
+  button.secondary{
+    background:var(--charcoal);
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+  }
+  .toolbar button{margin-top:0;}
+
+  /* ---- Preview / print document ---- */
+  #sheet-wrap{
+    background:#fff;
+    box-shadow:0 1px 6px rgba(0,0,0,.2);
+  }
+  #sheet{
+    width:210mm;
+    min-height:297mm;
+    margin:0 auto;
+    padding:15mm 20mm;
+    font-size:9pt;
+    line-height:1.35;
+  }
+  .doc-note{font-size:8pt;}
+  .doc-title{
+    text-align:center;
+    font-size:14pt;
+    letter-spacing:.6em;
+    margin:8pt 0 6pt;
+  }
+  .doc-lead{margin:4pt 0;font-size:9pt;}
+  .doc-date-line{
+    text-align:right;
+    margin:6pt 0;
+    font-size:9pt;
+  }
+  .doc-date-line span.era{padding:0 2px;}
+  .architect-block{
+    text-align:right;
+    line-height:1.55;
+    font-size:9pt;
+  }
+  .architect-block .indent{margin-right:2em;}
+  .kenchikunushi{
+    margin:14pt 0 8pt;
+    font-size:11pt;
+  }
+  table.doc-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:0;
+    font-size:8.5pt;
+  }
+  table.doc-table th, table.doc-table td{
+    border:1px solid #000;
+    padding:2px 4px;
+    vertical-align:middle;
+  }
+  table.doc-table td.label, table.doc-table th.label{
+    text-align:center;
+    width:19.5%;
+    background:#fafafa;
+  }
+  /* 同じ見出し（rowspanラベル）に属するデータ行同士の間は横罫線を表示しない */
+  table.doc-table tr.item-row td{
+    border-top:none;
+    border-bottom:none;
+  }
+  table.doc-table tr.item-row.row-last td{
+    border-bottom:1px solid #000;
+  }
+  td.center, th.center{text-align:center;}
+  .kouji-shubetsu span.item{
+    padding:1px 3px;
+  }
+  .kouji-shubetsu span.item.selected{
+    border:1px solid #000;
+    padding:1px 4px;
+    border-radius:2px;
+  }
+  .sub-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:8.6pt;
+  }
+  .sub-table th, .sub-table td{
+    border:1px solid #000;
+    padding:3px 4px;
+  }
+  .sub-table th{background:#fafafa;text-align:center;}
+  .editable{
+    outline:1px dashed transparent;
+    min-height:1em;
+  }
+  .editable:hover, .editable:focus{
+    outline:1px dashed #bbb;
+    background:#fffef2;
+  }
+  .kinyu-note{
+    font-size:8.5pt;
+    margin-top:10pt;
+  }
+  .kinyu-note p{margin:2px 0;}
+  .kinyu-note .kn-line{
+    display:flex;
+    align-items:flex-start;
+    margin:1px 0;
+  }
+  .kinyu-note .kn-prefix{
+    flex:0 0 auto;
+    width:8em;
+    text-align:right;
+    white-space:nowrap;
+    padding-right:0.4em;
+  }
+  .kinyu-note .kn-text{
+    flex:1 1 auto;
+  }
+
+  @media print{
+    body{background:#fff;padding:0;margin:0;}
+    .no-print{display:none !important;}
+    .layout{display:block;}
+    #sheet-wrap{box-shadow:none;}
+    #sheet{
+      width:auto;min-height:auto;
+      margin:0;padding:15mm 20mm;
+    }
+    .editable:hover, .editable:focus{outline:none;background:none;}
+    @page{ size:A4; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="no-print">工事監理報告書 作成ツール</h1>
+
+<div class="layout">
+
+  <!-- ============ 入力パネル ============ -->
+  <div class="panel no-print">
+    <h2>基本情報（手入力）</h2>
+
+    <label>建築主名</label>
+    <input type="text" id="clientName" placeholder="例）髙橋　祥平">
+
+    <label>報告書日付</label>
+    <input type="date" id="reportDate">
+
+    <label>建築物の名称及び所在地</label>
+    <input type="text" id="siteAddress" placeholder="例）前橋市朝倉町274番12，274番13，274番14">
+
+    <label>建築確認番号</label>
+    <input type="text" id="kakuninNo" placeholder="例）第　NKBI建-25RK0260V号">
+    <label class="checklabel"><input type="checkbox" id="hasKakuninHenko"> 変更確認番号がある</label>
+    <input type="text" id="kakuninNoHenko" placeholder="例）（第NKBI建-25RK0260V変2号）" style="display:none;margin-top:6px;">
+
+    <label>建築確認年月日</label>
+    <input type="date" id="kakuninDate">
+    <label class="checklabel"><input type="checkbox" id="hasKakuninDateHenko"> 変更確認年月日がある</label>
+    <input type="date" id="kakuninDateHenko" style="display:none;margin-top:6px;">
+
+    <h2>工事種別（該当項目を選択→印刷時に囲み表示）</h2>
+    <div class="radiogroup" id="shubetsuGroup">
+      <label><input type="radio" name="shubetsu" value="新築" checked> 新築</label>
+      <label><input type="radio" name="shubetsu" value="増築"> 増築</label>
+      <label><input type="radio" name="shubetsu" value="改築"> 改築</label>
+      <label><input type="radio" name="shubetsu" value="大規模の修繕"> 大規模の修繕</label>
+      <label><input type="radio" name="shubetsu" value="大規模の模様替"> 大規模の模様替</label>
+    </div>
+
+    <h2>工事期間（この期間から各表の日付を自動計算）</h2>
+    <div class="row2">
+      <div>
+        <label>開始日</label>
+        <input type="date" id="periodStart">
+      </div>
+      <div>
+        <label>終了日</label>
+        <input type="date" id="periodEnd">
+      </div>
+    </div>
+    <p class="hint">
+      髙橋様の報告書における「工事期間に対する各確認日の位置比率」をそのまま踏襲し、
+      新しい工事期間に合わせて各表の確認年月日を自動計算します。<br>
+      自動計算後の日付は、右側のプレビュー内で直接クリックして個別に修正できます。<br>
+      各表の項目名・設計図書の種類・確認方法もプレビュー上で直接編集できます（工事内容が異なる場合）。
+    </p>
+
+    <div class="toolbar">
+      <button onclick="render()">プレビューに反映</button>
+    </div>
+    <button class="secondary" onclick="window.print()">印刷 / PDF保存</button>
+  </div>
+
+  <!-- ============ プレビュー（印刷対象） ============ -->
+  <div id="sheet-wrap">
+    <div id="sheet">
+      <div class="doc-note">第四号の二の二書式（第十七条の十五関係）（Ａ４）</div>
+      <div class="doc-title">工　事　監　理　報　告　書</div>
+      <p class="doc-lead">工事監理を終了しましたので、建築士法第20条第３項の規定により、その結果を報告します。</p>
+
+      <div class="doc-date-line" id="out-reportDate">令和　　年　　月　　日</div>
+
+      <div class="architect-block">
+        <div>（一級）建築士（建設大臣）登録第　374701号</div>
+        <div class="indent">住所　群馬県利根郡川場村大字谷地1950</div>
+        <div>氏名　　北爪　俊之</div>
+        <div>（一級）建築士事務所（群馬県）知事登録第　2030　号</div>
+        <div>一級建築士事務所株式会社関工務所</div>
+        <div>所在地　群馬県利根郡川場村大字谷地1950</div>
+        <div>電話　0278-52-2239　　番</div>
+      </div>
+
+      <div class="kenchikunushi">建築主　<span id="out-clientName">　　　　　　　　</span>　殿</div>
+
+      <table class="doc-table" id="top-info-table">
+        <tr>
+          <td class="label">建築物の名称<br>及び所在地</td>
+          <td id="out-siteAddress"></td>
+        </tr>
+        <tr>
+          <td class="label">工　事　種　別</td>
+          <td class="kouji-shubetsu" id="out-shubetsu"></td>
+        </tr>
+        <tr>
+          <td class="label">建 築 確 認 番 号</td>
+          <td id="out-kakuninNo"></td>
+        </tr>
+        <tr>
+          <td class="label">建築確認年月日</td>
+          <td id="out-kakuninDate"></td>
+        </tr>
+        <tr>
+          <td class="label">工　事　期　間</td>
+          <td id="out-period" style="text-align:center;"></td>
+        </tr>
+      </table>
+
+      <table class="doc-table" id="henkou-table" style="margin-top:0;border-top:none;">
+        <tr>
+          <td class="label" rowspan="2">工事期間における<br>主要な設計変更</td>
+          <td class="center" style="width:15.3%;">変更年月日</td>
+          <td class="center" style="width:21.8%;">変更された設計図書の種類</td>
+          <td>変更の概要</td>
+        </tr>
+        <tr><td class="editable" contenteditable="true">なし</td><td class="editable" contenteditable="true"></td><td class="editable" contenteditable="true"></td></tr>
+      </table>
+
+      <table class="doc-table" style="margin-top:0;border-top:none;">
+        <tbody id="out-tableA">
+        <tr>
+          <td class="label" rowspan="11">主要な建築材料、<br>建築設備等が設計<br>図書のとおりであ<br>ることの確認</td>
+          <td class="center" style="width:15.3%;">確認年月日</td>
+          <td class="center" style="width:21.8%;">建築材料、建築設備等<br>の名称及び規格</td>
+          <td class="center" style="width:19.5%;">名称及び規格が定めら<br>れている設計図書の種類</td>
+          <td class="center">確認方法の概要</td>
+        </tr>
+        </tbody>
+      </table>
+
+      <div style="page-break-before:always;"></div>
+      <div id="page2-spacer"></div>
+
+      <table class="doc-table" style="margin-top:0;">
+        <tbody id="out-tableB">
+        <tr>
+          <td class="label" rowspan="11">主要な工事が設計<br>図書のとおりに実<br>行されていること<br>の確認</td>
+          <td class="center" style="width:15.3%;">確認年月日</td>
+          <td class="center" style="width:21.8%;">確認事項</td>
+          <td class="center" style="width:19.5%;">確認事項が定められて<br>いる設計図書の種類</td>
+          <td class="center">確認方法の概要</td>
+        </tr>
+        </tbody>
+      </table>
+
+      <div id="gap-b-c"></div>
+
+      <table class="doc-table" style="margin-top:0;">
+        <tbody id="out-tableC">
+        <tr>
+          <td class="label" rowspan="6">工事完了時にお<br>ける確認</td>
+          <td class="center" style="width:14.5%;">確認年月日</td>
+          <td class="center" style="width:34.3%;">確認事項</td>
+          <td class="center">確認結果の概要</td>
+        </tr>
+        </tbody>
+      </table>
+
+      <table class="doc-table" style="margin-top:0;border-top:none;">
+        <tr>
+          <td class="label" rowspan="2">工事施工者に<br>与えた注意</td>
+          <td class="center" style="width:14.5%;">注意年月日</td>
+          <td class="center" style="width:34.3%;">注意の概要</td>
+          <td>工事施工者の対応と建築主に対する報告の概要</td>
+        </tr>
+        <tr><td class="editable" contenteditable="true"></td><td class="editable" contenteditable="true">なし</td><td class="editable" contenteditable="true"></td></tr>
+      </table>
+
+      <table class="doc-table" style="margin-top:0;border-top:none;">
+        <tr>
+          <td class="label" rowspan="2">建築設備に係る<br>意見</td>
+          <td class="center" style="width:14.5%;">意見を聴いた<br>年月日</td>
+          <td class="center" style="width:21.5%;">意見を聴いた者の<br>住所及び氏名</td>
+          <td class="center" style="width:23.5%;">意見を聴いた者の勤務先<br>の住所及び名称</td>
+          <td>意見を聴いた事項</td>
+        </tr>
+        <tr>
+          <td class="editable" contenteditable="true"></td>
+          <td class="editable" contenteditable="true">なし</td>
+          <td class="editable" contenteditable="true" style="text-align:right;">電話　　　　　番</td>
+          <td class="editable" contenteditable="true"></td>
+        </tr>
+      </table>
+
+      <table class="doc-table" style="margin-top:0;border-top:none;">
+        <tr>
+          <td class="label">備　考</td>
+          <td class="editable" contenteditable="true"></td>
+        </tr>
+      </table>
+
+      <div class="kinyu-note">
+        <p class="kn-line"><span class="kn-prefix">〔記入注意〕　１</span><span class="kn-text">工事監理を共同で行った場合においては、連名で報告してください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">２</span><span class="kn-text">「工事種別」の欄は、該当するものを○で囲んでください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">３</span><span class="kn-text">「工事期間における主要な設計変更」の欄の変更の概要については、変更の内容、変更の理由等の概要を記入してください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">４</span><span class="kn-text">「工事施工者に与えた注意」の欄は、建築士法第18条第３項に規定する注意について記入してください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">５</span><span class="kn-text">「建築設備に係る意見」の欄は、建築士法第20条第５項に規定する場合に記入してください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">６</span><span class="kn-text">「備考」の欄は、工事監理に関して特に報告すべき事項等を記入してください。</span></p>
+        <p class="kn-line"><span class="kn-prefix">７</span><span class="kn-text">ここに記入しきれない場合には、別紙に書いて添えてください。</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- 髙橋様の書類から抽出した「工期に対する各確認日の位置比率」 ----
+const TABLE_A = [
+  {ratio:0.0858, name:"木材（主要構造部）", doc:"構造図", method:"立会い確認（目視）"},
+  {ratio:0.0858, name:"鉄筋・アンカーボルト", doc:"基礎伏図、標準仕様書", method:"立会い確認（目視）"},
+  {ratio:0.0858, name:"コンクリート", doc:"同上", method:"書類確認（納品書）"},
+  {ratio:0.3948, name:"屋根材（鋼板）", doc:"仕上表", method:"書類確認（納品書）"},
+  {ratio:0.4721, name:"外部建具（アルミサッシ）", doc:"立面図", method:"立会い確認（目視）"},
+  {ratio:0.6352, name:"内装材（壁ボード）", doc:"仕上表、平面図", method:"書類確認（納品書）"},
+  {ratio:0.7897, name:"内装材（床板）", doc:"仕上表、平面図", method:"立会い確認（目視）"},
+  {ratio:0.8326, name:"給排水衛生設備機器（ユニットバス、トイレ、システムキッチン、給湯器）", doc:"仕上表、平面図", method:"立会い確認（目視）"},
+  {ratio:0.8326, name:"電気設備機器（分電盤、照明器具）", doc:"仕様書、仕上表", method:"立会い確認（目視）"},
+  {ratio:0.9227, name:"外壁（リシン吹付）(板張り)", doc:"仕上表、立面図", method:"書類確認（納品書）"},
+];
+const TABLE_B = [
+  {ratio:-0.0386, name:"敷地の形状、高さ、建物の配置", doc:"配置図", method:"立会い確認（目視）"},
+  {ratio:0.0858, name:"基礎鉄筋、アンカーボルト", doc:"基礎伏図、標準仕様書", method:"団体検査員による検査"},
+  {ratio:0.1760, name:"基礎コンクリート", doc:"同上", method:"立会い確認（目視）"},
+  {ratio:0.3090, name:"外部建具種類大きさ", doc:"立面図", method:"立会い確認（目視）"},
+  {ratio:0.4378, name:"木造躯体工事（各部寸法、金物、耐力壁）", doc:"仕様書、各伏図", method:"立会い確認（目視）"},
+  {ratio:0.4163, name:"屋根材種類葺き方", doc:"仕上表", method:"立会い確認（目視）"},
+  {ratio:0.8112, name:"内装仕上状況", doc:"仕上表、平面図", method:"立会い確認（目視）"},
+  {ratio:0.8326, name:"給排水設備工事", doc:"仕上表、平面図", method:"立会い確認（目視）"},
+  {ratio:0.7897, name:"外壁防火性能", doc:"仕上表、立面図", method:"立会い確認（目視）"},
+  {ratio:0.8326, name:"電気設備工事", doc:"電気配線図", method:"設計図書との照合、立会い確認（目視）"},
+];
+const TABLE_C = [
+  {ratio:0.0,    name:"・建築物の各部分の位置、形状、及び大きさ", result:"適合"},
+  {ratio:0.8112, name:"・内装材の種類", result:"適合"},
+  {ratio:0.8541, name:"・建具開閉状況", result:"適合"},
+  {ratio:0.8541, name:"・換気システム", result:"適合"},
+  {ratio:0.8541, name:"・設備機器の作動", result:"適合"},
+];
+
+function toReiwa(dateObj){
+  if(!dateObj || isNaN(dateObj)) return "　　　　　　";
+  const y = dateObj.getFullYear();
+  const reiwa = y - 2018;
+  const m = dateObj.getMonth()+1;
+  const d = dateObj.getDate();
+  return `令和${reiwa}年${m}月${d}日`;
+}
+
+function parseDateInput(id){
+  const v = document.getElementById(id).value;
+  if(!v) return null;
+  const d = new Date(v+"T00:00:00");
+  return d;
+}
+
+function computeDateFromRatio(start, end, ratio){
+  if(!start || !end) return null;
+  const totalMs = end.getTime()-start.getTime();
+  const t = new Date(start.getTime() + totalMs*ratio);
+  // round to nearest day
+  t.setHours(0,0,0,0);
+  return t;
+}
+
+function buildRow(td, extraCols){
+  const tr = document.createElement("tr");
+  tr.className = "item-row";
+  const dateTd = document.createElement("td");
+  dateTd.className = "editable";
+  dateTd.contentEditable = "true";
+  dateTd.style.textAlign="center";
+  dateTd.textContent = td;
+  tr.appendChild(dateTd);
+  extraCols.forEach(c=>{
+    const cell = document.createElement("td");
+    cell.className = "editable";
+    cell.contentEditable = "true";
+    cell.textContent = c;
+    tr.appendChild(cell);
+  });
+  return tr;
+}
+
+function render(){
+  const clientName = document.getElementById("clientName").value || "　　　　　　　　";
+  const reportDate = parseDateInput("reportDate");
+  const siteAddress = document.getElementById("siteAddress").value || "";
+  const kakuninNo = document.getElementById("kakuninNo").value || "";
+  const hasKakuninNoHenko = document.getElementById("hasKakuninHenko").checked;
+  const kakuninNoHenko = document.getElementById("kakuninNoHenko").value || "";
+  const kakuninDate = parseDateInput("kakuninDate");
+  const hasKakuninDateHenko = document.getElementById("hasKakuninDateHenko").checked;
+  const kakuninDateHenko = parseDateInput("kakuninDateHenko");
+  const periodStart = parseDateInput("periodStart");
+  const periodEnd = parseDateInput("periodEnd");
+  const shubetsu = document.querySelector('input[name="shubetsu"]:checked').value;
+
+  document.getElementById("out-reportDate").textContent = toReiwa(reportDate);
+  document.getElementById("out-clientName").textContent = clientName;
+  document.getElementById("out-siteAddress").textContent = siteAddress;
+
+  // 工事種別（選択項目を囲む）
+  const items = ["新築","増築","改築","大規模の修繕","大規模の模様替"];
+  const shubetsuHtml = items.map((it,i)=>{
+    const cls = (it===shubetsu) ? "item selected" : "item";
+    const sep = (i<items.length-1) ? "　・　" : "";
+    return `<span class="${cls}">${it}</span>${sep}`;
+  }).join("");
+  document.getElementById("out-shubetsu").innerHTML = shubetsuHtml;
+
+  // 建築確認番号
+  let noHtml = kakuninNo;
+  if(hasKakuninNoHenko && kakuninNoHenko) noHtml += "　" + kakuninNoHenko;
+  document.getElementById("out-kakuninNo").textContent = noHtml;
+
+  // 建築確認年月日
+  let dateHtml = toReiwa(kakuninDate);
+  if(hasKakuninDateHenko && kakuninDateHenko) dateHtml += "　　（" + toReiwa(kakuninDateHenko) + "）";
+  document.getElementById("out-kakuninDate").textContent = dateHtml;
+
+  // 工事期間
+  if(periodStart && periodEnd){
+    document.getElementById("out-period").textContent =
+      toReiwa(periodStart) + "　から　" + toReiwa(periodEnd) + "まで";
+  } else {
+    document.getElementById("out-period").textContent = "令和　　年　　月　　日　から　令和　　年　　月　　日まで";
+  }
+
+  // 各表の自動日付計算（先頭の見出し行は残し、データ行のみ差し替える）
+  function fillTable(tbodyId, dataRows, cols){
+    const tbody = document.getElementById(tbodyId);
+    while(tbody.rows.length > 1){ tbody.deleteRow(1); }
+    dataRows.forEach((row, idx)=>{
+      const dt = computeDateFromRatio(periodStart, periodEnd, row.ratio);
+      const extra = cols.map(key=>row[key]);
+      const tr = buildRow(toReiwa(dt), extra);
+      if(idx === dataRows.length-1) tr.classList.add("row-last");
+      tbody.appendChild(tr);
+    });
+  }
+  fillTable("out-tableA", TABLE_A, ["name","doc","method"]);
+  fillTable("out-tableB", TABLE_B, ["name","doc","method"]);
+  fillTable("out-tableC", TABLE_C, ["name","result"]);
+
+  // 「主要な工事が...の確認」と「工事完了時における確認」の間を、確認年月日行の高さ分あける
+  alignGapBC();
+
+  // 行の高さを揃える（基本情報欄／工事期間における主要な設計変更欄）
+  equalizeRowHeights(document.getElementById("top-info-table"));
+  equalizeRowHeights(document.getElementById("henkou-table"));
+  // 1ページ目の余白を埋めるように、その行の高さをさらに広げる
+  expandRowsToFillPage1();
+  // 2ページ目の先頭余白を1ページ目のヘッダー分に合わせる
+  alignPage2Header();
+}
+
+function equalizeRowHeights(table){
+  if(!table) return;
+  const trs = Array.from(table.rows);
+  trs.forEach(tr => tr.style.height = "");
+  let maxH = 0;
+  trs.forEach(tr => { maxH = Math.max(maxH, tr.getBoundingClientRect().height); });
+  trs.forEach(tr => { tr.style.height = maxH + "px"; });
+}
+
+function expandRowsToFillPage1(){
+  const sheet = document.getElementById("sheet");
+  const tableA = document.getElementById("out-tableA");
+  if(!sheet || !tableA) return;
+  const rows = [
+    ...document.querySelectorAll("#top-info-table tr"),
+    ...document.querySelectorAll("#henkou-table tr")
+  ];
+  if(rows.length === 0) return;
+
+  const style = getComputedStyle(sheet);
+  const paddingTop = parseFloat(style.paddingTop);
+  const paddingBottom = parseFloat(style.paddingBottom);
+  const pagePx = 297 * (96/25.4); // A4の高さ(px, 96dpi換算)
+  const usable = pagePx - paddingTop - paddingBottom;
+
+  const sheetTop = sheet.getBoundingClientRect().top;
+  const tableABottom = tableA.getBoundingClientRect().bottom;
+  const usedSoFar = tableABottom - sheetTop - paddingTop;
+  const remaining = usable - usedSoFar;
+
+  if(remaining > 2){
+    const extraPerRow = remaining / rows.length;
+    rows.forEach(tr=>{
+      const curH = tr.getBoundingClientRect().height;
+      tr.style.height = (curH + extraPerRow) + "px";
+    });
+  }
+}
+
+function alignGapBC(){
+  const gap = document.getElementById("gap-b-c");
+  const tableC = document.getElementById("out-tableC");
+  if(!gap || !tableC || tableC.rows.length === 0) return;
+  const headerRow = tableC.rows[0];
+  gap.style.height = headerRow.getBoundingClientRect().height + "px";
+}
+function alignPage2Header(){
+  const sheet = document.getElementById("sheet");
+  const docNote = document.querySelector(".doc-note");
+  const spacer = document.getElementById("page2-spacer");
+  if(!sheet || !docNote || !spacer) return;
+  spacer.style.height = "0px";
+  const sheetTop = sheet.getBoundingClientRect().top;
+  const docNoteBottom = docNote.getBoundingClientRect().bottom;
+  // 1ページ目：用紙上端から「第四号の二の二書式（第十七条の十五関係）（Ａ４）」の行末までの距離
+  const headerHeight = docNoteBottom - sheetTop;
+  spacer.style.height = Math.max(headerHeight, 0) + "px";
+}
+
+document.getElementById("hasKakuninHenko").addEventListener("change", function(){
+  document.getElementById("kakuninNoHenko").style.display = this.checked ? "block" : "none";
+});
+document.getElementById("hasKakuninDateHenko").addEventListener("change", function(){
+  document.getElementById("kakuninDateHenko").style.display = this.checked ? "block" : "none";
+});
+
+// 初期表示
+render();
+</script>
+</body>
+</html>
